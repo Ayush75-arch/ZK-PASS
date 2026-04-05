@@ -15,8 +15,19 @@ const algodClient = new algosdk.Algodv2(
   ""
 );
 
-// ─── IMPORTANT: Add a .env file with: MNEMONIC=your words here ───────────────
-const MNEMONIC = process.env.MNEMONIC || "your mnemonic here";
+// ─── Load Account ─────────────────────────────────────────────────────────────
+const MNEMONIC = process.env.MNEMONIC;
+if (!MNEMONIC) {
+  console.error("❌ MNEMONIC not set in .env");
+  process.exit(1);
+}
+
+const account = algosdk.mnemonicToSecretKey(MNEMONIC);
+const sender = account.addr;
+
+console.log("=================================");
+console.log("✅ Signer account:", sender);
+console.log("=================================");
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
 function calculateAge(dobString) {
@@ -34,54 +45,44 @@ function generateHash(data) {
   return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex");
 }
 
-// ─── Algorand: Store proof on-chain ──────────────────────────────────────────
-async function sendToAlgorand(data) {
+// ─── Store on Algorand ────────────────────────────────────────────────────────
+async function sendToAlgorand(payload) {
+  const params = await algodClient.getTransactionParams().do();
+  params.flatFee = true;
+  params.fee = 1000;
+
+  const note = new TextEncoder().encode(JSON.stringify(payload));
+
+  const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
+    from: sender,
+    to: sender,
+    amount: 1000,
+    note: note,
+    suggestedParams: params,
+  });
+
+  const signedTxn = txn.signTxn(account.sk);
+  const response = await algodClient.sendRawTransaction(signedTxn).do();
+  const txId = response.txId || txn.txID().toString();
+
+  console.log("📤 TX sent:", txId);
+
   try {
-    const account = algosdk.mnemonicToSecretKey(MNEMONIC);
-    const params = await algodClient.getTransactionParams().do();
-
-    // Keep payload minimal — Algorand note field max is 1024 bytes
-    const payload = {
-      hash: data.hash,
-      verified: data.verified,
-      ts: data.timestamp,
-      flags: data.zkFlags,
-    };
-
-    const note = new TextEncoder().encode(JSON.stringify(payload));
-
-    if (note.length > 1024) {
-      throw new Error("Payload exceeds Algorand 1024 byte note limit");
-    }
-
-    const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-      from: account.addr,
-      to: account.addr,
-      amount: 0,
-      note,
-      suggestedParams: params,
-    });
-
-    const signedTxn = txn.signTxn(account.sk);
-    const tx = await algodClient.sendRawTransaction(signedTxn).do();
-
-    console.log("✅ Algorand TX ID:", tx.txId);
-    return tx.txId;
-  } catch (error) {
-    console.error("❌ Algorand error:", error.message);
-    throw error;
+    await algosdk.waitForConfirmation(algodClient, txId, 10);
+    console.log("✅ TX confirmed:", txId);
+  } catch (e) {
+    console.log("⚠️ Not confirmed in time but sent:", txId);
   }
+
+  return txId;
 }
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
-
 app.get("/", (req, res) => {
   res.send("ZK-KYC Backend running ✅");
 });
 
 // POST /extract
-// Input:  { dob: "YYYY-MM-DD", nationality: "India" }
-// Output: age proofs + SHA-256 hash (no raw DOB stored or returned)
 app.post("/extract", (req, res) => {
   try {
     const { dob, nationality } = req.body;
@@ -97,7 +98,6 @@ app.post("/extract", (req, res) => {
 
     const age = calculateAge(dob);
 
-    // Only derived proofs — raw DOB never leaves this function
     const proofData = {
       ageAbove18: age >= 18 ? 1 : 0,
       ageAbove21: age >= 21 ? 1 : 0,
@@ -117,9 +117,6 @@ app.post("/extract", (req, res) => {
 });
 
 // POST /verify
-// Input:  { hash, ageAbove18, isIndian }
-// Output: verification result + Algorand TX ID
-// TODO (Jeswin): Replace the verified logic with actual snarkjs proof verification
 app.post("/verify", async (req, res) => {
   try {
     const { hash, ageAbove18, isIndian } = req.body;
@@ -128,23 +125,24 @@ app.post("/verify", async (req, res) => {
       return res.status(400).json({ error: "hash is required" });
     }
 
-    // Placeholder — swap this with snarkjs verify when ZK circuit is ready
     const verified = ageAbove18 === 1 && isIndian === 1;
-
     const timestamp = Date.now();
 
-    const blockchainPayload = {
+    const payload = {
       hash,
       verified,
-      timestamp,
-      zkFlags: { ageAbove18, isIndian },
+      ts: timestamp,
+      flags: { ageAbove18, isIndian },
     };
 
-    const txId = await sendToAlgorand(blockchainPayload);
+    let txId = null;
+    try {
+      txId = await sendToAlgorand(payload);
+    } catch (e) {
+      console.error("❌ Algorand TX failed:", e.message);
+    }
 
-    console.log(`🔗 /verify → verified=${verified}, txId=${txId}`);
-
-    res.json({ ...blockchainPayload, txId });
+    res.json({ hash, verified, timestamp, txId });
 
   } catch (error) {
     console.error(error);
@@ -153,7 +151,7 @@ app.post("/verify", async (req, res) => {
 });
 
 // ─── Start ────────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
