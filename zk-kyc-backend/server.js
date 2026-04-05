@@ -1,5 +1,4 @@
 require("dotenv").config();
-console.log("ENV MNEMONIC:", process.env.MNEMONIC);
 const express = require("express");
 const algosdk = require("algosdk");
 const cors = require("cors");
@@ -8,7 +7,6 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 
-// 🔐 PASTE YOUR 25 WORD MNEMONIC HERE
 const mnemonic = process.env.MNEMONIC;
 
 const account = algosdk.mnemonicToSecretKey(mnemonic);
@@ -19,32 +17,25 @@ console.log("🚀 USING ACCOUNT:");
 console.log(sender);
 console.log("=================================");
 
-// Algorand client
 const algodClient = new algosdk.Algodv2(
   "",
   "https://testnet-api.algonode.cloud",
   ""
 );
 
-// Test route
 app.get("/", (req, res) => {
   res.send("Backend is running 🚀");
 });
 
-// Main verification route
 app.post("/verify", async (req, res) => {
   try {
     console.log("➡️ Verification request received");
 
     const params = await algodClient.getTransactionParams().do();
-
-    // 🔥 FIX: force proper fee
     params.flatFee = true;
     params.fee = 1000;
 
-    const note = new TextEncoder().encode(
-      "AGE_VERIFIED|LoanApp|demo"
-    );
+    const note = new TextEncoder().encode("AGE_VERIFIED|LoanApp|demo");
 
     const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
       sender: sender,
@@ -55,38 +46,26 @@ app.post("/verify", async (req, res) => {
     });
 
     const signedTxn = txn.signTxn(account.sk);
-const response = await algodClient
-  .sendRawTransaction(signedTxn)
-  .do();
+    const response = await algodClient.sendRawTransaction(signedTxn).do();
+    const txId = response.txId || txn.txID().toString();
 
-const txId = response.txId || txn.txID().toString();
+    console.log("📤 Transaction sent:", txId);
 
-console.log("📤 Transaction sent:", txId);
+    try {
+      await algosdk.waitForConfirmation(algodClient, txId, 10);
+      console.log("✅ Transaction confirmed");
+    } catch (e) {
+      console.log("⚠️ Not confirmed in time, but sent:", txId);
+    }
 
-// confirmation
-try {
-  await algosdk.waitForConfirmation(algodClient, txId, 10);
-  console.log("✅ Transaction confirmed");
-} catch (e) {
-  console.log("⚠️ Not confirmed in time, but sent:", txId);
-}
-
-    res.json({
-      success: true,
-      txId: txId,
-    });
+    res.json({ success: true, txId: txId });
 
   } catch (err) {
     console.error("❌ ERROR:", err);
-
-    res.status(500).json({
-      success: false,
-      error: err.message,
-    });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
-// Start server
 app.listen(5000, () => {
   console.log("=================================");
   console.log("✅ Server running on http://localhost:5000");
