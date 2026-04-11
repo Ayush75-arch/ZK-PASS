@@ -1,0 +1,6 @@
+node_modules/
+backend/.env
+*.wtns
+input_*.json
+proof.json
+public.json
