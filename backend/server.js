@@ -18,7 +18,7 @@ const algodClient = new algosdk.Algodv2(
   ""
 );
 
-// ─── Load Account (YOUR WORKING CODE) ────────────────────────────────────────
+// ─── Load Account────────────────────────────────────────
 const mnemonic = process.env.MNEMONIC;
 if (!mnemonic) {
   console.error("❌ MNEMONIC not set in .env");
@@ -26,7 +26,8 @@ if (!mnemonic) {
 }
 
 const account = algosdk.mnemonicToSecretKey(mnemonic);
-const sender = account.addr;
+// In algosdk v3+, addr is an Address object - convert to string
+const sender = account.addr.toString();
 
 console.log("=================================");
 console.log("✅ Signer account:", sender);
@@ -48,11 +49,11 @@ function generateHash(data) {
   return crypto.createHash("sha256").update(JSON.stringify(data)).digest("hex");
 }
 
-// ─── ZK Proof Generation (JESWIN'S CODE) ─────────────────────────────────────
+// ─── ZK Proof Generation ─────────────────────────────────────
 function runProof(inputFile) {
   return new Promise((resolve, reject) => {
     exec(
-      `node age_js/generate_witness.js age_js/age.wasm ${inputFile} witness.wtns && npx snarkjs groth16 prove age_final.zkey witness.wtns proof.json public.json`,
+      `node identity_js/generate_witness.js identity_js/identity.wasm ${inputFile} witness.wtns && npx snarkjs groth16 prove identity_final.zkey witness.wtns proof.json public.json`,
       { cwd: __dirname },
       (err, stdout, stderr) => {
         if (err) {
@@ -66,7 +67,7 @@ function runProof(inputFile) {
   });
 }
 
-// ─── Store on Algorand (YOUR WORKING CODE) ────────────────────────────────────
+// ─── Store on Algorand────────────────────────────────────
 async function sendToAlgorand(data) {
   const params = await algodClient.getTransactionParams().do();
   params.flatFee = true;
@@ -75,8 +76,8 @@ async function sendToAlgorand(data) {
   const note = new TextEncoder().encode(JSON.stringify(data));
 
   const txn = algosdk.makePaymentTxnWithSuggestedParamsFromObject({
-    from: sender,
-    to: sender,
+    sender: sender,
+    receiver: sender,
     amount: 1000,
     note: note,
     suggestedParams: params,
@@ -84,7 +85,7 @@ async function sendToAlgorand(data) {
 
   const signedTxn = txn.signTxn(account.sk);
   const response = await algodClient.sendRawTransaction(signedTxn).do();
-  const txId = response.txId || txn.txID().toString();
+  const txId = response.txId || response.txid || txn.txID();
 
   console.log("📤 TX sent:", txId);
 
@@ -114,10 +115,13 @@ app.post("/generate-proof", async (req, res) => {
     const age = calculateAge(dob);
     if (isNaN(age) || age < 0) return res.status(400).json({ error: "Invalid DOB" });
 
+    // Convert nationality to boolean
+    const isIndian = nationality && nationality.toLowerCase() === "india" ? 1 : 0;
+
     const id = Date.now();
     const inputFile = `input_${id}.json`;
-    fs.writeFileSync(inputFile, JSON.stringify({ age }));
-    console.log("📥 ZK input: age =", age);
+    fs.writeFileSync(inputFile, JSON.stringify({ age, isIndian }));
+    console.log("📥 ZK input: age =", age, ", isIndian =", isIndian);
 
     await runProof(inputFile);
     try { fs.unlinkSync(inputFile); } catch (e) {}
@@ -128,11 +132,11 @@ app.post("/generate-proof", async (req, res) => {
     const flags = {
       ageAbove18: age >= 18 ? 1 : 0,
       ageAbove21: age >= 21 ? 1 : 0,
-      isIndian: nationality && nationality.toLowerCase() === "india" ? 1 : 0,
+      isIndian: isIndian,
     };
 
     const hash = generateHash(flags);
-    console.log("✅ Proof generated for age:", age);
+    console.log("✅ Proof generated for age:", age, "isIndian:", isIndian);
 
     res.json({ proof, publicSignals, flags, hash, age });
 

@@ -178,7 +178,7 @@ function App() {
           <p style={{ marginTop: 8 }}>
             TX ID:{" "}
             <a
-              href={`https://testnet.algoexplorer.io/tx/${txId}`}
+              href={`https://lora.algokit.io/testnet/transaction/${txId}`}
               target="_blank"
               rel="noreferrer"
               style={{ fontFamily: "monospace", fontSize: 13 }}
