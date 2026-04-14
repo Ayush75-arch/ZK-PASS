@@ -97,4 +97,7 @@ export async function verifyProof({ proof, publicSignals }) {
     credentials: "include"
   });
   return res.json();
+  
+console.log("fresh deploy");
+
 }
