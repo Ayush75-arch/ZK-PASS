@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { revokeToken, getTokenStatus, verifyProof } from "../api";
 
-const BACKEND      = "import.meta.env.VITE_API_URL";
+const BACKEND      = import.meta.env.VITE_API_URL;
 const CLIENT_ID    = "zkpass_client";
 const REDIRECT_URI = "https://zk-pass-vgub.vercel.app/callback";
 
