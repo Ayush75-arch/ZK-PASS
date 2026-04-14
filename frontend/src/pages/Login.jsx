@@ -32,8 +32,7 @@ export default function Login() {
     setError(""); setLoading(true);
     try {
       const { sessionId } = await loginUser({ userId: selected, client_id: clientId, redirect_uri: redirectUri, state });
-      const API = import.meta.env.VITE_API_URL;
-      window.location.href = `${API}/consent?session_id=${sessionId}`;
+      window.location.href = `/consent?session_id=${sessionId}`;
     } catch (e) {
       setError(e.message || "Login failed. Please try again.");
       setLoading(false);

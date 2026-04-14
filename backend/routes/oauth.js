@@ -3,6 +3,8 @@ const router  = express.Router();
 const crypto  = require("crypto");
 const { users, sessions, authCodes, tokens } = require("../store");
 
+const FRONTEND_URL = process.env.FRONTEND_URL || "https://zk-pass-vgub.vercel.app";
+
 // ──────────────────────────────────────────────────────────────────────────────
 // GET /authorize
 // Entry point for OAuth flow — validates params, redirects to login UI.
@@ -15,7 +17,7 @@ router.get("/authorize", (req, res) => {
   if (response_type !== "code")
     return res.status(400).json({ error: "unsupported_response_type" });
 
-  const loginUrl = new URL("https://zk-pass-vgub.vercel.app/login");
+  const loginUrl = new URL(`${FRONTEND_URL}/login`);
   loginUrl.searchParams.set("client_id",    client_id);
   loginUrl.searchParams.set("redirect_uri", redirect_uri);
   loginUrl.searchParams.set("state",        state || "");
@@ -115,6 +117,9 @@ router.post("/token", (req, res) => {
   const authCode = authCodes.get(code);
   if (!authCode)
     return res.status(400).json({ error: "invalid_grant", error_description: "Code is invalid or already used" });
+
+  if (authCode.client_id !== client_id)
+    return res.status(400).json({ error: "invalid_grant", error_description: "client_id mismatch" });
 
   if (Date.now() - authCode.createdAt > 5 * 60 * 1000) {
     authCodes.delete(code);

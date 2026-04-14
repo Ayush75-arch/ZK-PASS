@@ -7,7 +7,10 @@ export async function loginUser({ userId, client_id, redirect_uri, state }) {
     body: JSON.stringify({ userId, client_id, redirect_uri, state }),
     credentials: "include"
   });
-  if (!res.ok) throw new Error((await res.json()).error || "Login failed");
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Login failed");
+  }
   return res.json();
 }
 
@@ -15,7 +18,13 @@ export async function getConsentInfo(sessionId) {
   const res = await fetch(`${BACKEND}/consent-info?session_id=${sessionId}`, {
     credentials: "include"
   });
-  if (!res.ok) throw new Error((await res.json()).error || "Session invalid");
+  if (!res.ok) {
+    const err = await res.json();
+    if (err.error === "invalid_session" || err.error === "session_expired") {
+      throw new Error("Session expired or server restarted. Please start the flow again.");
+    }
+    throw new Error(err.error || "Session invalid");
+  }
   return res.json();
 }
 
@@ -97,8 +106,4 @@ export async function verifyProof({ proof, publicSignals }) {
     credentials: "include"
   });
   return res.json();
-  
-console.log("fresh deploy");
-
-
 }
