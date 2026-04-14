@@ -15,7 +15,7 @@ router.get("/authorize", (req, res) => {
   if (response_type !== "code")
     return res.status(400).json({ error: "unsupported_response_type" });
 
-  const loginUrl = new URL("http://localhost:5173/login");
+  const loginUrl = new URL("https://zk-pass-vgub.vercel.app/login");
   loginUrl.searchParams.set("client_id",    client_id);
   loginUrl.searchParams.set("redirect_uri", redirect_uri);
   loginUrl.searchParams.set("state",        state || "");
