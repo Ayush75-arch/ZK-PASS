@@ -33,7 +33,8 @@ export default function Home() {
   function startOAuth() {
     const state = Math.random().toString(36).slice(2);
     sessionStorage.setItem("oauthState", state);
-    const url = new URL(`${BACKEND}/authorize`);
+    const url = `${BACKEND}/authorize`;
+    window.location.href = url;
     url.searchParams.set("client_id",     CLIENT_ID);
     url.searchParams.set("redirect_uri",  REDIRECT_URI);
     url.searchParams.set("state",         state);
