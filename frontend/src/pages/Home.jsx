@@ -5,6 +5,8 @@ const BACKEND      = "import.meta.env.VITE_API_URL";
 const CLIENT_ID    = "zkpass_client";
 const REDIRECT_URI = "https://zk-pass-vgub.vercel.app/callback";
 
+console.log("ENV CHECK:", import.meta.env.VITE_API_URL);
+
 export default function Home() {
   const [proof,      setProof]      = useState(() => {
     try { return JSON.parse(sessionStorage.getItem("zkProof") || "null"); } catch { return null; }

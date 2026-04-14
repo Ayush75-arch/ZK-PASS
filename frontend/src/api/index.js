@@ -100,4 +100,5 @@ export async function verifyProof({ proof, publicSignals }) {
   
 console.log("fresh deploy");
 
+
 }
