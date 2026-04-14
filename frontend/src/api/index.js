@@ -1,7 +1,5 @@
 const BACKEND = import.meta.env.VITE_API_URL;
 
-// ── OAuth ─────────────────────────────────────────────────────────────
-
 export async function loginUser({ userId, client_id, redirect_uri, state }) {
   const res = await fetch(`${BACKEND}/login`, {
     method: "POST",
