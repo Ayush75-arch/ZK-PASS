@@ -24,7 +24,7 @@ export default function Login() {
   const [error,    setError]    = useState("");
 
   const clientId    = params.get("client_id")    || "mock_client";
-  const redirectUri = params.get("redirect_uri") || "http://localhost:3000/callback";
+  const redirectUri =  params.get("redirect_uri") || "https://zk-pass-vgub.vercel.app/callback";
   const state       = params.get("state")        || "";
 
   async function handleLogin() {
@@ -32,7 +32,8 @@ export default function Login() {
     setError(""); setLoading(true);
     try {
       const { sessionId } = await loginUser({ userId: selected, client_id: clientId, redirect_uri: redirectUri, state });
-      window.location.href = `/consent?session_id=${sessionId}`;
+      const API = import.meta.env.VITE_API_URL;
+      window.location.href = `${API}/consent?session_id=${sessionId}`;
     } catch (e) {
       setError(e.message || "Login failed. Please try again.");
       setLoading(false);
